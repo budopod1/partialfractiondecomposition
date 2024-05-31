@@ -55,5 +55,7 @@ dkms.conf
 main
 main-debug
 .ccls-cache
+.ccls-cache/*
 .cache
 .breakpoints
+*.blob
