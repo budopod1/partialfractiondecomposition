@@ -50,3 +50,10 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Other
+main
+main-debug
+.ccls-cache
+.cache
+.breakpoints
