@@ -53,37 +53,42 @@ void print_exponent_num(int num) {
     }
 }
 
+void print_monomial(int is_first, double coef, uint32_t power) {
+    if (is_zero(coef)) return;
+    if (is_first) {
+        if (coef < 0) {
+            coef *= -1;
+            printf("-");
+        }
+    } else {
+        if (coef < 0) {
+            coef *= -1;
+            printf(" - ");
+        } else {
+            printf(" + ");
+        }
+    }
+    if (power == 0 || !is_double_eq(coef, 1)) printf("%g", coef);
+    if (power > 0) {
+        printf("x");
+        if (power > 1) {
+            print_exponent_num(power);
+        }
+    }
+}
+
 void print_polynomial(polynomial_t *p) {
     uint32_t coef_count = polynomial_coef_count(p);
     int is_first = 1;
     for (int32_t i = coef_count - 1; i >= 0; i--) {
         double coef = p->coefs[i];
-        if (is_first) {
-            is_first = 0;
-            if (is_double_eq(coef, -1)) {
-                printf("-");
-                coef = 1;
-            }
-        } else {
-            if (coef < 0) {
-                coef *= -1;
-                printf(" - ");
-            } else {
-                printf(" + ");
-            }
-        }
-        if (!is_double_eq(coef, 1) || i == 0) printf("%f", coef);
-        if (i > 0) {
-            printf("x");
-            if (i > 1) {
-                print_exponent_num(i);
-            }
-        }
+        print_monomial(is_first, coef, i);
+        is_first = 0;
     }
 }
 
 void print_factored(factored_t *f) {
-    for (int i = 0; i < f->count; i++) {
+    for (uint32_t i = 0; i < f->count; i++) {
         printf("(");
         print_polynomial(&f->factors[i]);
         printf(")");
@@ -91,14 +96,14 @@ void print_factored(factored_t *f) {
 }
 
 void print_factored_list(factored_list_t *l) {
-    for (int i = 0; i < l->count; i++) {
+    for (uint32_t i = 0; i < l->count; i++) {
         print_factored(&l->factoreds[i]);
         printf("\n");
     }
 }
 
 void print_polynomial_list(polynomial_list_t *l) {
-    for (int i = 0; i < l->count; i++) {
+    for (uint32_t i = 0; i < l->count; i++) {
         print_polynomial(&l->polynomials[i]);
         printf("\n");
     }
@@ -137,21 +142,21 @@ void free_held_factored(factored_t *factored) {
     free(factored->factors);
 }
 
-void free_polynomial_list(polynomial_list_t *list) {
-    for (uint32_t i = 0; i < list->count; i++) {
-        free(list->polynomials[i].coefs);
+void free_polynomial_list(polynomial_list_t list) {
+    for (uint32_t i = 0; i < list.count; i++) {
+        free(list.polynomials[i].coefs);
     }
-    free_list((generic_list_t*)list);
+    free(list.polynomials);
 }
 
-void free_factored_list_shallow(factored_list_t *list) {
-    for (uint32_t i = 0; i < list->count; i++) {
-        free(list->factoreds[i].factors);
+void free_factored_list_shallow(factored_list_t list) {
+    for (uint32_t i = 0; i < list.count; i++) {
+        free(list.factoreds[i].factors);
     }
-    free_list((generic_list_t*)list);
+    free(list.factoreds);
 }
 
-polynomial_t *make_polynomial(double coefs[], int32_t count) {
+polynomial_t *make_polynomial(double coefs[], uint32_t count) {
     polynomial_t *result = malloc(sizeof(polynomial_t));
     double *coefs_mem = malloc(sizeof(double) * count);
     memcpy(coefs_mem, coefs, sizeof(double) * count);
@@ -160,7 +165,7 @@ polynomial_t *make_polynomial(double coefs[], int32_t count) {
     return result;
 }
 
-factored_t *make_factored(polynomial_t *factors[], int32_t count) {
+factored_t *make_factored(polynomial_t *factors[], uint32_t count) {
     factored_t *result = malloc(sizeof(polynomial_t));
     polynomial_t *factors_mem = malloc(sizeof(polynomial_t) * count);
     for (uint32_t i = 0; i < count; i++) {
@@ -210,13 +215,13 @@ uint32_t _all_factored_combos_recurse(factored_t *factors, factored_list_t *list
     return cap;
 }
 
-factored_list_t *all_factored_combos(factored_t *factors) {
-    factored_list_t *list = (factored_list_t*)blank_list();
+void generate_all_factored_combos(factored_t *factors, factored_list_t *out) {
+    out->count = 0;
+    out->factoreds = NULL;
     uint32_t cap = 0;
     uint32_t stack[factors->count-1];
     uint32_t stack_count = 0;
-    _all_factored_combos_recurse(factors, list, cap, stack, &stack_count);
-    return list;
+    _all_factored_combos_recurse(factors, out, cap, stack, &stack_count);
 }
 
 polynomial_t *multiply_polynomials(polynomial_t *a, polynomial_t *b, polynomial_t *result) {
@@ -235,15 +240,15 @@ polynomial_t *multiply_polynomials(polynomial_t *a, polynomial_t *b, polynomial_
 
 polynomial_t *add_polynomials(polynomial_t *a, polynomial_t *b, polynomial_t *result) {
     if (result == NULL) result = malloc(sizeof(polynomial_t));
-    
+
     uint32_t ca = polynomial_coef_count(a);
     uint32_t cb = polynomial_coef_count(b);
-    
+
     polynomial_t *first;
     polynomial_t *second;
     uint32_t count;
     uint32_t subcount;
-    
+
     if (ca > cb) {
         count = ca;
         subcount = cb;
@@ -255,16 +260,16 @@ polynomial_t *add_polynomials(polynomial_t *a, polynomial_t *b, polynomial_t *re
         first = b;
         second = a;
     }
-    
+
     double *coefs = malloc(sizeof(double) * count);
     memcpy(coefs+subcount, first->coefs+subcount, sizeof(double) * (count-subcount));
     for (uint32_t i = 0; i < subcount; i++) {
         coefs[i] = first->coefs[i] + second->coefs[i];
     }
-    
+
     result->count = count;
     result->coefs = coefs;
-    
+
     return result;
 }
 
@@ -280,6 +285,17 @@ polynomial_t *scale_polynomial(polynomial_t *p, double scale, polynomial_t *resu
     result->count = count;
     result->coefs = coefs;
 
+    return result;
+}
+
+polynomial_t *shift_polynomial(polynomial_t *p, uint32_t amount, polynomial_t *result) {
+    if (result == NULL) result = malloc(sizeof(polynomial_t));
+    uint32_t count = p->count + amount;
+    double *coefs = malloc(sizeof(double) * count);
+    memset(coefs, 0, sizeof(double) * amount);
+    memcpy(coefs+amount, p->coefs, sizeof(double) * p->count);
+    result->count = count;
+    result->coefs = coefs;
     return result;
 }
 
@@ -303,37 +319,27 @@ void expand_factored(factored_t *f, polynomial_t *result) {
     }
 }
 
-polynomial_list_t *expand_factored_list(factored_list_t *list) {
-    polynomial_list_t *result = malloc(sizeof(factored_list_t));
-    polynomial_t *polynomials = malloc(sizeof(polynomial_t) * list->count);
+void expand_factored_list(factored_list_t list, polynomial_list_t *result) {
+    polynomial_t *polynomials = malloc(sizeof(polynomial_t) * list.count);
     result->polynomials = polynomials;
-    result->count = list->count;
-    for (uint32_t i = 0; i < list->count; i++) {
-        expand_factored(&list->factoreds[i], &polynomials[i]);
+    result->count = list.count;
+    for (uint32_t i = 0; i < list.count; i++) {
+        expand_factored(&list.factoreds[i], &polynomials[i]);
     }
-    return result;
 }
 
-void dedup_factored_polynomial_lists(factored_list_t *fi, polynomial_list_t *pi, factored_list_t **fn_p, polynomial_list_t **pn_p) {
-    uint32_t count = fi->count;
-    if (count != pi->count) {
-        abort_("Cannot perform a combined dedup on lists of different lengths");
-    }
-    
-    factored_list_t *fn = malloc(sizeof(factored_list_t));
+void dedup_factored_polynomial_lists(factored_list_t *f, polynomial_list_t *p) {
+    uint32_t count = f->count;
+
     factored_t *fs = malloc(sizeof(factored_t) * count);
-    fn->factoreds = fs;
-    
-    polynomial_list_t *pn = malloc(sizeof(polynomial_list_t));
     polynomial_t *ps = malloc(sizeof(polynomial_t) * count);
-    pn->polynomials = ps;
-    
+
     uint32_t idx = 0;
     for (uint32_t i = 0; i < count; i++) {
-        factored_t *factored = &fi->factoreds[i];
-        polynomial_t *polynomial = &pi->polynomials[i];
-        for (int32_t j = i-1; j >= 0; j--) {
-            polynomial_t *polynomial2 = &pi->polynomials[j];
+        factored_t *factored = &f->factoreds[i];
+        polynomial_t *polynomial = &p->polynomials[i];
+        for (uint32_t j = i+1; j < count; j++) {
+            polynomial_t *polynomial2 = &p->polynomials[j];
             if (polynomial_eq(polynomial, polynomial2)) {
                 goto is_duplicate;
             }
@@ -343,37 +349,84 @@ void dedup_factored_polynomial_lists(factored_list_t *fi, polynomial_list_t *pi,
         ps[idx] = *polynomial;
         idx++;
         continue;
-        
+
     is_duplicate:
         free(factored->factors);
         free(polynomial->coefs);
         continue;
     }
-    
-    fn->count = idx;
-    pn->count = idx;
 
-    free_list((generic_list_t*)*fn_p);
-    free_list((generic_list_t*)*pn_p);
+    free(p->polynomials);
+    free(f->factoreds);
     
-    *fn_p = fn;
-    *pn_p = pn;
+    f->count = idx;
+    f->factoreds = fs;
+    
+    p->count = idx;
+    p->polynomials = ps;
 }
 
-factored_list_t *factored_over_factored_list(factored_t *factors, factored_list_t *list) {
-    factored_list_t *result = malloc(sizeof(factored_list_t));
-    factored_t *factoreds = malloc(sizeof(factored_t) * list->count);
-    result->factoreds = factoreds;
-    result->count = list->count;
+uint32_t *create_numerator_powers(polynomial_t *numerator, factored_list_t fi, factored_list_t *fn, polynomial_list_t *pl) {
+    uint32_t numerator_count = numerator->count;
+    uint32_t *max_num_powers = malloc(sizeof(uint32_t) * fi.count);
+
+    uint32_t count = 0;
     
-    for (uint32_t i = 0; i < list->count; i++) {
-        factored_t old = list->factoreds[i];
+    for (uint32_t i = 0; i < fi.count; i++) {
+        uint32_t coef_count = polynomial_coef_count(&pl->polynomials[i]);
+        uint32_t max_num_power = coef_count - 1;
+        if (coef_count + max_num_power >= numerator_count) {
+            max_num_power = numerator_count - coef_count;
+        }
+        max_num_powers[i] = max_num_power;
+        count += max_num_power + 1;
+    }
+
+    factored_t *fs = malloc(sizeof(factored_t) * count);
+    
+    polynomial_t *ps = malloc(sizeof(polynomial_t) * count);
+
+    uint32_t *powers = malloc(sizeof(uint32_t) * count);
+
+    uint32_t idx = 0;
+    for (uint32_t i = 0; i < fi.count; i++) {
+        factored_t factored = fi.factoreds[i];
+        polynomial_t polynomial = pl->polynomials[i];
+        uint32_t max_num_power = max_num_powers[i];
+        for (uint32_t power = 0; power <= max_num_power; (power++, idx++)) {
+            fs[idx] = factored;
+            shift_polynomial(&polynomial, power, &ps[idx]);
+            powers[idx] = power;
+        }
+        free(polynomial.coefs);
+    }
+
+    free(pl->polynomials);
+    
+    pl->polynomials = ps;
+    pl->count = count;
+
+    free(max_num_powers);
+    
+    fn->factoreds = fs;
+    fn->count = count;
+
+    return powers;
+}
+
+void factored_over_factored_list(factored_t *factors, factored_list_t list, factored_list_t *result) {
+    factored_t *factoreds = malloc(sizeof(factored_t) * list.count);
+    result->factoreds = factoreds;
+    result->count = list.count;
+
+    for (uint32_t i = 0; i < list.count; i++) {
+        factored_t old = list.factoreds[i];
         factored_t *new_ = factoreds + i;
         uint32_t count = factors->count - old.count;
         new_->count = count;
         polynomial_t *new_factors = malloc(sizeof(polynomial_t) * count);
         new_->factors = new_factors;
-        
+
         uint32_t idx = 0;
 
         char used_factors[factors->count];
@@ -391,17 +444,15 @@ factored_list_t *factored_over_factored_list(factored_t *factors, factored_list_
 
             new_factors[idx++] = factor;
 
-        not_included:;
+not_included:;
         }
     }
-
-    return result;
 }
 
-void make_matrix(double matrix[], uint32_t matrix_width, uint32_t matrix_height, polynomial_list_t *polynomial_list, polynomial_t *numerator) {
+void make_matrix(double matrix[], uint32_t matrix_width, uint32_t matrix_height, polynomial_list_t polynomial_list, polynomial_t *numerator) {
     for (uint32_t x = 0; x < matrix_width - 1; x++) {
         double *cell_p = matrix + x;
-        polynomial_t polynomial = polynomial_list->polynomials[x];
+        polynomial_t polynomial = polynomial_list.polynomials[x];
         uint32_t y = 0;
         for (; y < polynomial.count; y++) {
             *cell_p = polynomial.coefs[y];
@@ -465,31 +516,28 @@ void filter_zero_multiple_polynomial_list(polynomial_list_t *polynomials, double
     polynomials->count = idx;
 }
 
-void print_decomposed_result(polynomial_list_t *polynomials, double multiples[]) {
-    for (uint32_t i = 0; i < polynomials->count; i++) {
-        double multiple = multiples[i];
-        if (i > 0) {
-            if (multiple < 0) {
-                printf(" - ");
-                multiple *= -1;
-            } else {
-                printf(" + ");
-            }
-        }
-        printf("%f/(", multiple);
-        print_polynomial(&polynomials->polynomials[i]);
+void print_decomposed_result(polynomial_list_t polynomials, uint32_t *powers, double multiples[]) {
+    for (uint32_t i = 0; i < polynomials.count; i++) {
+        print_monomial(i == 0, multiples[i], powers[i]);
+        printf("/(");
+        print_polynomial(&polynomials.polynomials[i]);
         printf(")");
     }
 }
 
 int main() {
+    int allow_power_numerators = 1;
+    
     polynomial_t *numerator = make_polynomial(
-        (double[]) {-44, -8, -26, -2, -4}, 5);
+        (double[]) {375, -199, 36, -2}, 4);
     factored_t *denominator = make_factored((polynomial_t*[]) {
-        make_polynomial((double[]) {1, 1}, 2),
-        make_polynomial((double[]) {3, 0, 1}, 3),
-        make_polynomial((double[]) {3, 0, 1}, 3)
-    }, 3);
+        make_polynomial((double[]) {0, 1}, 2),
+        make_polynomial((double[]) {-5, 1}, 2),
+        make_polynomial((double[]) {-5, 1}, 2),
+        make_polynomial((double[]) {-5, 1}, 2),
+    }, 4);
+
+    // TODO: deal with constant terms (terms of coef_count 1) seperately
 
     printf("(");
     print_polynomial(numerator);
@@ -497,39 +545,54 @@ int main() {
     print_factored(denominator);
     printf("\n");
 
-    factored_list_t *factors_list = all_factored_combos(denominator);
-    polynomial_list_t *polynomial_list = expand_factored_list(factors_list);
-    dedup_factored_polynomial_lists(
-        factors_list, polynomial_list, &factors_list, &polynomial_list);
+    factored_list_t factors_list;
+    generate_all_factored_combos(denominator, &factors_list);
+    polynomial_list_t polynomial_list;
+    expand_factored_list(factors_list, &polynomial_list);
+    dedup_factored_polynomial_lists(&factors_list, &polynomial_list);
 
-    uint32_t matrix_width = polynomial_list->count + 1;
+    factored_list_t new_factors_list;
+    
+    uint32_t *powers;
+    if (allow_power_numerators) {
+        powers = create_numerator_powers(numerator, factors_list, &new_factors_list, &polynomial_list);
+    } else {
+        powers = calloc(1, sizeof(uint32_t) * polynomial_list.count);
+        new_factors_list = factors_list;
+    }
+
+    uint32_t matrix_width = polynomial_list.count + 1;
     uint32_t matrix_height = numerator->count;
 
     double matrix[matrix_width * matrix_height];
 
     make_matrix(matrix, matrix_width, matrix_height, polynomial_list, numerator);
-    
+
     rref(matrix, matrix_width, matrix_height);
 
-    double multiples[polynomial_list->count];
+    double multiples[polynomial_list.count];
 
-    int inconsistent = extract_leading_values(matrix, matrix_width, matrix_height, multiples, polynomial_list->count);
+    int inconsistent = extract_leading_values(matrix, matrix_width, matrix_height, multiples, polynomial_list.count);
 
     if (inconsistent) {
         printf("Can't find the partial fraction decomposition\n");
         printf("sorry\n");
         return 0;
     }
-    
-    factored_list_t *inverse_factors = factored_over_factored_list(
-        denominator, factors_list);
-    polynomial_list_t *inverse_polynomials = expand_factored_list(inverse_factors);
 
-    filter_zero_multiple_polynomial_list(inverse_polynomials, multiples);
+    factored_list_t inverse_factors;
+    factored_over_factored_list(denominator, new_factors_list, &inverse_factors);
+    polynomial_list_t inverse_polynomials;
+    expand_factored_list(inverse_factors, &inverse_polynomials);
 
-    print_decomposed_result(inverse_polynomials, multiples);
+    filter_zero_multiple_polynomial_list(&inverse_polynomials, multiples);
+
+    print_decomposed_result(inverse_polynomials, powers, multiples);
     printf("\n");
-    
+
+    free(powers);
+
+    if (new_factors_list.factoreds != factors_list.factoreds) free(new_factors_list.factoreds);
     free_factored_list_shallow(factors_list);
     free_polynomial_list(polynomial_list);
     free_factored_list_shallow(inverse_factors);

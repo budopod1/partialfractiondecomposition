@@ -35,7 +35,7 @@ void rref(double *matrix, uint32_t width, uint32_t height) {
     double spare[width];
     uint32_t ey = 0;
     for (uint32_t ex = 0; ex < width; ex++) {
-        uint32_t chosen_row = -1;
+        int32_t maybe_chosen_row = -1;
         double chosen_val;
         double min_mag = INFINITY;
 
@@ -48,12 +48,13 @@ void rref(double *matrix, uint32_t width, uint32_t height) {
             if (mag < 1) mag /= 1;
             if (mag < min_mag) {
                 min_mag = mag;
-                chosen_row = row;
+                maybe_chosen_row = row;
                 chosen_val = val;
             }
         }
 
-        if (chosen_row == -1) continue;
+        if (maybe_chosen_row < 0) continue;
+        uint32_t chosen_row = maybe_chosen_row;
 
         uint32_t rest_row = width - ex;
         double *offset_matrix = matrix + ex;
