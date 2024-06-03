@@ -184,6 +184,25 @@ int polynomial_eq(polynomial_t *a, polynomial_t *b) {
     return memcmp(a->coefs, b->coefs, sizeof(double) * count) == 0;
 }
 
+double factor_out_constant(factored_t *f) {
+    double c = 1;
+    polynomial_t *factors = malloc(sizeof(polynomial_t) * f->count);
+    uint32_t idx = 0;
+    for (uint32_t i = 0; i < f->count; i++) {
+        polynomial_t *p = &f->factors[i];
+        if (polynomial_coef_count(p) == 1) {
+            c *= p->coefs[0];
+            free(p->coefs);
+        } else {
+            factors[idx++] = *p;
+        }
+    }
+    free(f->factors);
+    f->count = idx;
+    f->factors = factors;
+    return c;
+}
+
 uint32_t _all_factored_combos_append(factored_t *factors, factored_list_t *list, uint32_t cap, uint32_t stack[], uint32_t stack_count) {
     polynomial_t *polynomials = malloc(sizeof(polynomial_t) * stack_count);
     for (uint32_t i = 0; i < stack_count; i++) {
@@ -516,6 +535,12 @@ void filter_zero_multiple_polynomial_list(polynomial_list_t *polynomials, double
     polynomials->count = idx;
 }
 
+void scale_multiples(double c, double *multiples, uint32_t multiples_count) {
+    for (uint32_t i = 0; i < multiples_count; i++) {
+        multiples[i] *= c;
+    }
+}
+
 void print_decomposed_result(polynomial_list_t polynomials, uint32_t *powers, double multiples[]) {
     for (uint32_t i = 0; i < polynomials.count; i++) {
         print_monomial(i == 0, multiples[i], powers[i]);
@@ -535,13 +560,14 @@ int main() {
         make_polynomial((double[]) {-5, 1}, 2),
         make_polynomial((double[]) {-5, 1}, 2),
         make_polynomial((double[]) {-5, 1}, 2),
-    }, 4);
+        make_polynomial((double[]) {2}, 1),
+    }, 5);
 
-    // TODO: deal with constant terms (terms of coef_count 1) seperately
+    double front_constant = 1/factor_out_constant(denominator);
 
     printf("(");
     print_polynomial(numerator);
-    printf(")/");
+    printf(")/%g", front_constant);
     print_factored(denominator);
     printf("\n");
 
@@ -586,6 +612,8 @@ int main() {
     expand_factored_list(inverse_factors, &inverse_polynomials);
 
     filter_zero_multiple_polynomial_list(&inverse_polynomials, multiples);
+
+    scale_multiples(front_constant, multiples, inverse_polynomials.count);
 
     print_decomposed_result(inverse_polynomials, powers, multiples);
     printf("\n");
